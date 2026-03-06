@@ -1,16 +1,16 @@
 #include <raylib.h>
 #include <stdio.h>
-#include <math.h>
 
 #define DISPLAY_WIDTH 800
 #define DISPLAY_HEIGHT 600
-#define BALL_SPEED 170
 #define BALL_SIZE 20
+#define BALL_SPEED 200
+#define BALL_ACCELERATION 20
 #define PLAYER_SPEED 300
 #define PLAYER_WIDTH 20
 #define PLAYER_HEIGHT 70
-#define BALL_ACCELERATION 10
-#define INNER_PADDING 10
+#define PADDING 10
+#define AUTO_PLAY false
 
 float f_clamp(float x, float min, float max) {
     const float r = x < min ? min : x;
@@ -28,21 +28,21 @@ int main(void)
 
     int p1_score = 0;
     int p2_score = 0;
-    Vector2 p1_pos = { INNER_PADDING,  DISPLAY_HEIGHT/2 };
-    Vector2 p2_pos = { DISPLAY_WIDTH - PLAYER_WIDTH - INNER_PADDING, DISPLAY_HEIGHT/2 };
+    int rally = 0;
+    Vector2 p1_pos = { PADDING,  DISPLAY_HEIGHT/2 };
+    Vector2 p2_pos = { DISPLAY_WIDTH - PLAYER_WIDTH - PADDING, DISPLAY_HEIGHT/2 };
     Vector2 ball_pos = { DISPLAY_WIDTH/2, DISPLAY_HEIGHT/2 };
     Vector2 ball_dir = { 1, 1 };
     float t = 0.0f;
 
     int target = 1;
     bool reset = false;
-    bool paused = false;
     while (!WindowShouldClose())
     {
         if (reset) {
-            p1_pos.x = INNER_PADDING;
+            p1_pos.x = PADDING;
             p1_pos.y = DISPLAY_HEIGHT/2;
-            p2_pos.x = DISPLAY_WIDTH - PLAYER_WIDTH - INNER_PADDING;
+            p2_pos.x = DISPLAY_WIDTH - PLAYER_WIDTH - PADDING;
             p2_pos.y = DISPLAY_HEIGHT/2;
             ball_pos.x = DISPLAY_WIDTH/2;
             ball_pos.y = DISPLAY_HEIGHT/2;
@@ -50,17 +50,26 @@ int main(void)
             t = 0.0f;
             reset = false;
             target = ball_dir.x;
+            rally = 0;
         }
 
         BeginDrawing();
         ClearBackground(BLACK);
+        DrawLine(DISPLAY_WIDTH/2, 0, DISPLAY_WIDTH/2, DISPLAY_HEIGHT, RAYWHITE);
 
-        float dt = GetFrameTime();
-        if (IsKeyDown(KEY_W)) p1_pos.y    = f_clamp(p1_pos.y - PLAYER_SPEED * dt, INNER_PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - INNER_PADDING);
-        if (IsKeyDown(KEY_S)) p1_pos.y    = f_clamp(p1_pos.y + PLAYER_SPEED * dt, INNER_PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - INNER_PADDING);
-        if (IsKeyDown(KEY_UP)) p2_pos.y   = f_clamp(p2_pos.y - PLAYER_SPEED * dt, INNER_PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - INNER_PADDING);
-        if (IsKeyDown(KEY_DOWN)) p2_pos.y = f_clamp(p2_pos.y + PLAYER_SPEED * dt, INNER_PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - INNER_PADDING);
-        
+        // Clamping dt because of render pausing when dragging window! Don't want big jumps in frames.
+        const float dt = f_clamp(GetFrameTime(), 0, 0.1);
+        if (!AUTO_PLAY) {
+            if (IsKeyDown(KEY_W)) p1_pos.y    = f_clamp(p1_pos.y - PLAYER_SPEED * dt, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+            if (IsKeyDown(KEY_S)) p1_pos.y    = f_clamp(p1_pos.y + PLAYER_SPEED * dt, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+            if (IsKeyDown(KEY_UP)) p2_pos.y   = f_clamp(p2_pos.y - PLAYER_SPEED * dt, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+            if (IsKeyDown(KEY_DOWN)) p2_pos.y = f_clamp(p2_pos.y + PLAYER_SPEED * dt, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+        } else { 
+            float y = ball_pos.y - PLAYER_HEIGHT/2;
+            p1_pos.y = f_clamp(y, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+            p2_pos.y = f_clamp(y, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+        }
+
         t += dt;
         ball_pos.x += (BALL_SPEED + (BALL_ACCELERATION * t)) * dt * ball_dir.x;
         ball_pos.y += (BALL_SPEED + (BALL_ACCELERATION * t)) * dt * ball_dir.y;
@@ -68,24 +77,18 @@ int main(void)
         if (ball_pos.y >= (DISPLAY_HEIGHT - BALL_SIZE)) ball_dir.y = -1;
         if (ball_pos.y <= 0) ball_dir.y = 1;
         
-        // Left side (player1) detection
-        int lAnchorX = p1_pos.x;
-        if (
-            (ball_pos.x >= lAnchorX) &&
-            (ball_pos.x <= lAnchorX + BALL_SIZE) &&
-            (ball_pos.y >= p1_pos.y - BALL_SIZE) &&
-            (ball_pos.y <= p1_pos.y + PLAYER_HEIGHT + BALL_SIZE) &&
-            target < 0
-        ) {
+        // Left side (player1) hit detection
+        if ((ball_pos.x >= p1_pos.x) && (ball_pos.x <= p1_pos.x + BALL_SIZE) && (ball_pos.y >= p1_pos.y - BALL_SIZE) && (ball_pos.y <= p1_pos.y + PLAYER_HEIGHT + BALL_SIZE) && target == -1) {
             ball_dir.x = 1;
             PlaySound(sfx_hit);
             target = 1;
+            rally++;
         }
-        // Right side (player2) detection
-        int rAnchorX = p2_pos.x;
+
+        // Right side (player2) hit detection
         if (
-            (ball_pos.x >= rAnchorX - BALL_SIZE) &&
-            (ball_pos.x <= rAnchorX) &&
+            (ball_pos.x >= p2_pos.x - BALL_SIZE) &&
+            (ball_pos.x <= p2_pos.x) &&
             (ball_pos.y >= p2_pos.y - BALL_SIZE) &&
             (ball_pos.y <= p2_pos.y + PLAYER_HEIGHT + BALL_SIZE) &&
             target > 0
@@ -93,22 +96,24 @@ int main(void)
             ball_dir.x = -1;
             PlaySound(sfx_hit);
             target = -1;
+            rally++;
         }
 
         // Score checks
         if (ball_pos.x >= DISPLAY_WIDTH + (BALL_SIZE/2)) {
-            p1_score += 1;
+            p1_score++;
             reset = true;
             PlaySound(sfx_score);
         } else if (ball_pos.x <= -(BALL_SIZE/2)) {
-            p2_score += 1;
+            p2_score++;
             reset = true;
             PlaySound(sfx_score);
         }
 
-        DrawText(TextFormat("Player 1: %d", p1_score), INNER_PADDING, 10, 24, BLUE);
-        DrawText(TextFormat("Player 2: %d", p2_score), INNER_PADDING, 36, 24, RED);
-        
+        DrawText(TextFormat("Player 1: %d", p1_score), 10, 10, 24, BLUE);
+        DrawText(TextFormat("Player 2: %d", p2_score), 10, 36, 24, RED);
+        DrawText(TextFormat("Rally: %d",    rally),    10, 62, 18, GREEN);
+
         DrawRectangle(p1_pos.x, p1_pos.y, PLAYER_WIDTH, PLAYER_HEIGHT, RAYWHITE);
         DrawRectangle(p2_pos.x, p2_pos.y, PLAYER_WIDTH, PLAYER_HEIGHT, RAYWHITE);
         DrawRectangle(ball_pos.x, ball_pos.y, BALL_SIZE, BALL_SIZE, RAYWHITE);
