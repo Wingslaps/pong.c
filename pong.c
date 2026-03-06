@@ -4,12 +4,12 @@
 #define DISPLAY_HEIGHT 600
 #define BALL_SIZE 20
 #define BALL_SPEED 200
-#define BALL_ACCELERATION 20
-#define PLAYER_SPEED 300
+#define BALL_ACCELERATION 25
+#define PLAYER_SPEED 500
 #define PLAYER_WIDTH 20
 #define PLAYER_HEIGHT 70
 #define PADDING 10
-#define AUTO_PLAY false
+#define AUTO_PLAY true
 
 float f_clamp(float x, float min, float max) {
     const float r = x < min ? min : x;
@@ -24,6 +24,7 @@ int main(void)
 
     Sound sfx_hit = LoadSound("sounds/hit.wav");
     Sound sfx_score = LoadSound("sounds/score.wav");
+    Sound sfx_meme = LoadSound("sounds/67.wav");
 
     int p1_score = 0;
     int p2_score = 0;
@@ -65,8 +66,13 @@ int main(void)
             if (IsKeyDown(KEY_DOWN)) p2_pos.y = f_clamp(p2_pos.y + PLAYER_SPEED * dt, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
         } else { 
             float y = ball_pos.y - PLAYER_HEIGHT/2;
-            p1_pos.y = f_clamp(y, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
-            p2_pos.y = f_clamp(y, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+            
+            // Unnecessary segmenting to make it look cooler when auto-playing
+            if (ball_pos.x <= DISPLAY_WIDTH/2) {
+                p1_pos.y = f_clamp(y, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+            } else {
+                p2_pos.y = f_clamp(y, PADDING, DISPLAY_HEIGHT - PLAYER_HEIGHT - PADDING);
+            }
         }
 
         t += dt;
@@ -85,17 +91,15 @@ int main(void)
         }
 
         // Right side (player2) hit detection
-        if (
-            (ball_pos.x >= p2_pos.x - BALL_SIZE) &&
-            (ball_pos.x <= p2_pos.x) &&
-            (ball_pos.y >= p2_pos.y - BALL_SIZE) &&
-            (ball_pos.y <= p2_pos.y + PLAYER_HEIGHT + BALL_SIZE) &&
-            target > 0
-        ) {
+        if ((ball_pos.x >= p2_pos.x - BALL_SIZE) && (ball_pos.x <= p2_pos.x) && (ball_pos.y >= p2_pos.y - BALL_SIZE) && (ball_pos.y <= p2_pos.y + PLAYER_HEIGHT + BALL_SIZE) && target == 1) {
             ball_dir.x = -1;
             PlaySound(sfx_hit);
             target = -1;
             rally++;
+        }
+
+        if (rally == 60) {
+            PlaySound(sfx_meme);
         }
 
         // Score checks
@@ -112,11 +116,9 @@ int main(void)
         DrawText(TextFormat("Player 1: %d", p1_score), 10, 10, 24, BLUE);
         DrawText(TextFormat("Player 2: %d", p2_score), 10, 36, 24, RED);
         DrawText(TextFormat("Rally: %d",    rally),    10, 62, 18, GREEN);
-
         DrawRectangle(p1_pos.x, p1_pos.y, PLAYER_WIDTH, PLAYER_HEIGHT, RAYWHITE);
         DrawRectangle(p2_pos.x, p2_pos.y, PLAYER_WIDTH, PLAYER_HEIGHT, RAYWHITE);
         DrawRectangle(ball_pos.x, ball_pos.y, BALL_SIZE, BALL_SIZE, RAYWHITE);
-
         EndDrawing();
     }
 
