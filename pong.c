@@ -9,7 +9,7 @@
 #define PLAYER_WIDTH 20
 #define PLAYER_HEIGHT 70
 #define PADDING 10
-#define AUTO_PLAY true
+#define AUTO_PLAY false
 
 float f_clamp(float x, float min, float max) {
     const float r = x < min ? min : x;
